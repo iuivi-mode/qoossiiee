@@ -1,5 +1,6 @@
 ffmpeg-python
 librosa
+numpy
 pydub
 pyfiglet
 typer
