@@ -48,11 +48,7 @@ from rich.layout import Layout
 from rich.panel import Panel
 from rich.progress import (
     BarColumn,
-    DownloadColumn,
     Progress,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-    SpinnerColumn,
 )
 from rich.text import Text
 from rich.table import Table
@@ -62,19 +58,6 @@ from yt_dlp.utils import sanitize_filename
 consola= Console()
 # consola.print("[green italic] xd oh si [/green italic]")
 
-# Boiler opciones de progress bars
-progress_columns = [
-    "[progress.description]{task.description}",
-    BarColumn(bar_width=None),
-    "[progress.percentage]{task.percentage:>3.0f}%",
-    "•",
-    DownloadColumn(),
-    "•",
-    SpinnerColumn("material"),
-    ".",
-    SpinnerColumn("hearts"),
-
-]
 
 
 def Figlich(msg, coloro, modo, tipox="heart_right"):
@@ -435,122 +418,56 @@ def Mp3fy(input_file, output_file):
         return False
 
 
-def YT_Presta(linku, layout):
-    """descarga youtube con layout de carga"""
-    try:
-        # Get video info
-        with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
-            info_dict = ydl.extract_info(linku, download=False)
-            video_title = info_dict.get("title", "Unknown")
-            safe_title = sanitize_filename(video_title)
-
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": f"{safe_title}.%(ext)s",
-            "quiet": True,
-            "progress_hooks": [],
-        }
-
-        # Initialize progress display
-        progress = Progress(*progress_columns)
-        download_task = progress.add_task(
-            f"[cyan]Downloading {video_title[:30]}...", 
-            total=100
-        )
-
-        # Create progress panel
-        progress_panel = Panel(
-            f"[bold yellow]{video_title}[/]\n"
-            f"[magenta]URL:[/] [blue]{linku}[/]\n\n"
-            f"{progress}",
-            title="[blink]7u7 Descargando 7u7[/blink]",
-            border_style="yellow"
-        )
-        layout["content"].update(progress_panel)
-
-        def progress_hook(d):
-            if d["status"] == "downloading":
-                if d.get("total_bytes"):
-                    progress.update(
-                        download_task,
-                        completed=(d["downloaded_bytes"] / d["total_bytes"]) * 100,
-                    )
-                elif d.get("total_bytes_estimate"):
-                    progress.update(
-                        download_task,
-                        completed=(d["downloaded_bytes"] / d["total_bytes_estimate"])
-                        * 100,
-                    )
-                else:
-                    progress.update(download_task, advance=0.5)
-            elif d["status"] == "finished":
-                progress.update(
-                    download_task,
-                    completed=100,
-                    description="[green]preparando mp3zacion xd...[/green]",
-                )
-
-        ydl_opts["progress_hooks"].append(progress_hook)
-
-        # Start download
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([linku])
-
-        # Final update
-        layout["content"].update(
-            Panel.fit(
-                f"[bold green]✓ Descargado ![/]\n"
-                f"[yellow]File:[/] {safe_title}.webm",
-                border_style="green"
-            )
-        )
-        return safe_title
-
-    except Exception as e:
-        layout["content"].update(
-            Panel.fit(
-                f"[bold red]✗ Descarga F![/]\n"
-                f"[yellow]Error:[/] {str(e)}",
-                border_style="red"
-            )
-        )
-        return None
-
 
 def casa(waveform_active=False, waveform_height=6):
-    """Enhanced layout with dynamic footer sizing for waveform display"""
+    """Responsive layout with dynamic sizing to prevent scrolling issues"""
     layout = Layout()
-
-    # Calculate footer size based on waveform status
-    footer_size = 3 if not waveform_active else waveform_height + 4
     
-    # Use minimum sizes to prevent cutoff
+    # Get terminal dimensions for responsive design
+    terminal_height = consola.size.height
+    terminal_width = consola.size.width
+    
+    # Calculate responsive sizes
+    header_size = max(2, min(3, terminal_height // 12))  # 2-3 lines based on terminal
+    footer_base = max(2, min(3, terminal_height // 10))  # Responsive base footer
+    footer_size = footer_base if not waveform_active else max(footer_base, waveform_height + 3)
+    
+    # Ensure we don't exceed 70% of terminal height for fixed elements
+    max_fixed = int(terminal_height * 0.7)
+    if header_size + footer_size > max_fixed:
+        footer_size = max(2, max_fixed - header_size)
+    
+    # Use responsive sizes to prevent scrolling
     layout.split(
-        Layout(name="header", minimum_size=4),  # Allow header to expand
+        Layout(name="header", minimum_size=header_size),
         Layout(name="main"),
-        Layout(name="footer", size=footer_size),
+        Layout(name="footer", minimum_size=footer_base, size=footer_size),
     )
     
-    # Main content with better ratios
+    # Responsive sidebar sizing
+    sidebar_min = max(16, min(25, terminal_width // 5))  # 16-25 chars, max 20% width
     layout["main"].split_row(
-        Layout(name="content", ratio=3),  # Increased ratio
-        Layout(name="sidebar", minimum_size=25, ratio=1)
+        Layout(name="content", ratio=3),
+        Layout(name="sidebar", minimum_size=sidebar_min, ratio=1)
     )
 
-    # Header with proper content and sizing
-    header_content = Align.center(
-        Text.from_markup(
-            "[bold blink]🎵 Qoossie Audio Downloader 🎵[/]\n"
-            "[italic cyan]YouTube → MP3/WAV Converter[/]\n"
-            "[dim]Enhanced TUI Experience[/]"
+    # Adaptive header content based on available space
+    if header_size >= 3:
+        header_content = Align.center(
+            Text.from_markup(
+                "[bold blink]🎵 Qoossie Audio Downloader 🎵[/]\n"
+                "[italic cyan]YouTube → MP3/WAV Converter[/]"
+            )
         )
-    )
+    else:
+        header_content = Align.center(
+            Text.from_markup("[bold blink]🎵 Qoossie 🎵[/]")
+        )
     
     layout["header"].update(
         Panel(
             header_content,
-            border_style="green",
-            height=4  # Explicit height to prevent cutoff
+            border_style="green"
         )
     )
 
@@ -562,10 +479,11 @@ def casa(waveform_active=False, waveform_height=6):
             Layout(name="waveform", size=waveform_height + 1)
         )
         
-        # Controls panel
+        # Compact controls panel
+        controls_text = "[yellow][bold]ESC[/] quit • [bold]ENTER[/] new • [bold]t[/] toggle • [bold]h[/] hide[/yellow]"
         layout["footer"]["controls"].update(
             Panel(
-                "[yellow]Controls: [bold]ESC[/] to quit • [bold]ENTER[/] for new • [bold]t[/] toggle waveform • [bold]h[/] hide waveform[/yellow]",
+                controls_text,
                 border_style="yellow"
             )
         )
@@ -579,9 +497,11 @@ def casa(waveform_active=False, waveform_height=6):
             )
         )
     else:
+        # Compact default footer
+        controls_text = "[yellow][bold]ESC[/] quit • [bold]ENTER[/] submit • [bold]w[/] waveform[/yellow]"
         layout["footer"].update(
             Panel(
-                "[yellow]Controls: [bold]ESC[/] to quit • [bold]ENTER[/] to submit • [bold]w[/] for waveform[/yellow]",
+                controls_text,
                 border_style="yellow"
             )
         )
