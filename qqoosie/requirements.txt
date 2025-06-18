@@ -1,0 +1,9 @@
+ffmpeg-python
+librosa
+pydub
+pyfiglet
+typer
+yt-dlp
+rich
+soundfile
+asciimatics
